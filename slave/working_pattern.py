@@ -4,10 +4,10 @@ import threading
 
 
 def do_pattern(pattern, q, local_dir, repo_dir):
-    if pattern is 'master-slave':
-        do_master_slave(q, local_dir, repo_dir)
-    elif pattern is 'working-push':
-        do_working_push(q, local_dir, repo_dir)
+    if pattern == 'master-slave':
+        return do_master_slave(q, local_dir, repo_dir)
+    elif pattern == 'working-push':
+        return do_working_push(q, local_dir, repo_dir)
 
 def do_master_slave(q, local_dir, repo_dir):
 

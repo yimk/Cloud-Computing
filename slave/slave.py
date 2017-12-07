@@ -28,7 +28,7 @@ MASTER_PORT = '5000'
 The task queue
 """
 
-work_queue = queue.Queue
+work_queue = queue.Queue()
 
 
 """
@@ -54,15 +54,22 @@ pattern = None
 #
 
 def ask_for_work():
-    data = request.get_json(force=True)
-    commit_hex = data.get('commit')
-    file = data.get('file')
-    work_queue.put(item=(file, commit_hex))
 
-    return jsonify({'result': 'success'})
+    # require master to give slave work
+    link = "http://{}/ask-for-work".format(MASTER_HOST + ':' + MASTER_PORT)
+    headers = {'host': 'localhost', 'port': sys.argv[1]}
+    response = requests.post(link, data=json.dumps({}), headers=headers)
+
+    json_data = json.loads(response.text)
+    for task in json_data['tasks']:
+        commit_hex = task['commit']
+        file = task['file']
+        work_queue.put(item=(file, commit_hex))
 
 
 def register():
+
+    print("Register Slave Node")
 
     # require master to register slave
     link = "http://{}/register".format(MASTER_HOST + ':' + MASTER_PORT)
@@ -88,22 +95,24 @@ def register():
     # repo_url = response.headers.get('git-repo')
     # helper.git_clone_or_pull(repo_url, TARGET_DIR)
 
+    print("Registration is Successful")
+
 
 def do_work():
     if not work_queue.empty():
-        # get the work from the queue
-        complexities = working_pattern.do_pattern(pattern, queue, TARGET_DIR, git_repo)
+        # get the work from the queue{TypeError}empty() missing 1 required positional argument: 'self'
+        complexities = working_pattern.do_pattern(pattern, work_queue, TARGET_DIR, git_repo)
 
         # require master to register slave
         link = "http://{}/result".format(MASTER_HOST + ':' + MASTER_PORT)
         headers = {'host': 'localhost', 'port': sys.argv[1]}
-        requests.post(link, data=json.dumps({complexities}), headers=headers)
+        requests.post(link, data=json.dumps(complexities), headers=headers)
     else:
         ask_for_work()
 
 
 if __name__ == '__main__':
-    slave.run(debug=True, use_reloader=False, port=sys.argv[1])
+    slave.run(debug=False, use_reloader=False, port=sys.argv[1])
     register()
 
     while True:

@@ -1,7 +1,7 @@
 import glob
 from pymongo import MongoClient
 import datetime
-from git import Repo
+from git import Repo, Git
 import os
 import lizard
 
@@ -9,8 +9,10 @@ import lizard
 file reading helper
 """
 
+
 def get_file_in_dir(dir):
     return [file_name.replace(dir, '') for file_name in glob.glob(dir + "/**/*.*", recursive=True, )]
+
 
 def get_worker_info(base="docker-compose.yml"):
     # ports = []
@@ -50,17 +52,8 @@ def retrieve_repository_tasks(repo, dir):
 
 
 """
-mongodb helper
+mongodb helper for tasks table
 """
-
-
-def db_get_expired_tasks(expire_minute=5):
-
-    expire_tasks = []
-    for task in db_get_incompleted_tasks():
-        if task['start_time'] and (datetime.datetime.now() - task['start_time']).minute > expire_minute:
-            expire_tasks.append(task)
-    return expire_tasks
 
 
 def db_insert_single_task(file, commit):
@@ -70,20 +63,22 @@ def db_insert_single_task(file, commit):
         "start_time": None,
         "slave_address": None,
         "completed": False,
-        "assigned": False
+        "assigned": False,
+        "result": None
     }
     tasks_table().insert_one(post)
 
 
 def db_start_task(file, commit, slave):
-    db_get_all_tasks().find_one_and_update({"file": file, 'commit': commit},
-                                           {"$set": {"slave": slave,
-                                                     "start_time": datetime.datetime.now()}})
+    tasks_table().find_one_and_update({'file': file, 'commit': commit},
+                                           {"$set": {"slave_address": slave,
+                                                     "start_time": datetime.datetime.now(),
+                                                     "assigned": True}})
 
 
-def db_end_task(file, commit):
-    db_get_all_tasks().find_one_and_update({"file": file, 'commit': commit},
-                                           {"$set": {"completed": True}})
+def db_complete_task(file, commit, result):
+    tasks_table().find_one_and_update({"file": file, 'commit': commit},
+                                           {"$set": {"completed": True, "result": result}})
 
 
 def tasks_table():
@@ -95,12 +90,39 @@ def db_get_all_tasks():
     return tasks_table().find()
 
 
-def db_get_incompleted_tasks():
+def db_get_incomplete_tasks():
     return tasks_table().find({"completed": False})
+
+
+def db_get_expired_tasks(expire_second=300):
+
+    expire_tasks = []
+    for task in db_get_incomplete_tasks():
+        if task['start_time'] and (datetime.datetime.now() - task['start_time']).seconds > expire_second:
+            expire_tasks.append(task)
+    return expire_tasks
 
 
 def db_get_unassigned_task():
     return tasks_table().find({"completed": False, "assigned": False})
+
+
+def db_get_avg_complexity_result():
+
+    n = tasks_table().count()
+    pipe = [{'$group': {'_id': None, 'total': {'$sum': '$goals'}}}]
+    sum_complexity = tasks_table().aggregate([{'$group': {'_id': None, 'total': {'$sum': '$result'}}}])
+
+    result = list(sum_complexity)[0]
+    if result['sum'] > 0 and n > 0:
+        return result['sum']/n
+    else:
+        return 0
+
+
+"""
+mongodb helper for slaves table
+"""
 
 
 def db_insert_single_slave(addr):
@@ -129,15 +151,15 @@ git helper
 
 
 def git_checkout(dir, commit):
-    repo = Repo(dir)
-    git1 = repo.git
-    git1.checkout(commit)
+    g = Git(dir)
+    g.init()
+    g.checkout(commit)
 
 
 def git_clone_or_pull(repo_dir, local_dir):
 
     if not os.path.exists(local_dir):
-        Repo.clone_from(repo_dir, local_dir)
+        Repo.clone_from(repo_dir , local_dir)
 
     return Repo(local_dir)
 
@@ -149,5 +171,5 @@ Complexity Computation helper
 
 def compute_complexity(file_dir, local_dir, repo_url, commit_hex, complexity):
     git_clone_or_pull(repo_url, local_dir)
-    git_checkout(file_dir, commit_hex)
-    complexity.put((lizard.analyze_file(file_dir).average_cyclomatic_complexity, file_dir, commit_hex))
+    git_checkout(local_dir, commit_hex)
+    complexity.put({'complexity': lizard.analyze_file(local_dir+file_dir).average_cyclomatic_complexity, 'file': file_dir, 'commit': commit_hex})
