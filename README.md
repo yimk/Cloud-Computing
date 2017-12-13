@@ -17,7 +17,8 @@ Another Problem with traditional master-slave and working-push pattern is the wa
     - This means all slaves get same amount of work which stays in their queue
     - When one slave is much faster then the other(different hardware or maybe the task assigned is actually small, e.g we dont know the size of file need to be parsed). The faster slave will need to wait other slave.
 
-    - My master-slave/working-push implementation - slave are proactive, they ask master for job
+    - My master-slave/working-push implementation - when slave starts they will register themself to the master
+                                                  - slave then works proactively, they ask master for job
                                                   - this allows me to give faster slave more job.
 
     e.g - Instead of split all the jobs and assign all these tasks to all the slaves in the very beginning,
@@ -27,5 +28,22 @@ Another Problem with traditional master-slave and working-push pattern is the wa
         - this keeps all the nodes busy all the time
         - THIS ALSO allows me to handle real-time new slave member,
         - e.g new slave can join the system at any time and my master can just assign it incompleted or expired tasks
+        
+     - The problem with master-slave is that it requires many tasks to be assigned in a time(e.g it will process many tasks in parallel). To solve this issue, instead of making the server assign one task to one slave in a time, it assign five. Hence, the slave server will compute 5 files in parallel in a time.
 
 ## Run Application
+
+### Enter following command to install required packages
+    
+    pip install -r requirements.txt
+
+### Run slave servers(You are allowed to run unlimited number of slaves)
+
+    python slave/slave.py <uid>
+    
+### Run Master server
+
+    python master/master.py <uid>
+    
+    
+    
