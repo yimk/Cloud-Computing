@@ -158,9 +158,11 @@ def git_checkout(dir, commit):
 
 def git_clone_or_pull(repo_dir, local_dir):
 
-    if not os.path.exists(local_dir):
-        Repo.clone_from(repo_dir , local_dir)
-    
+    if os.path.exists(local_dir):
+        import shutil
+        shutil.rmtree(local_dir)
+        
+    Repo.clone_from(repo_dir , local_dir)
     return Repo(local_dir)
 
 
