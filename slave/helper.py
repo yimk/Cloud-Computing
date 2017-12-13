@@ -160,7 +160,7 @@ def git_clone_or_pull(repo_dir, local_dir):
 
     if not os.path.exists(local_dir):
         Repo.clone_from(repo_dir , local_dir)
-
+    
     return Repo(local_dir)
 
 
@@ -170,6 +170,5 @@ Complexity Computation helper
 
 
 def compute_complexity(file_dir, local_dir, repo_url, commit_hex, complexity):
-    git_clone_or_pull(repo_url, local_dir)
     git_checkout(local_dir, commit_hex)
     complexity.put({'complexity': lizard.analyze_file(local_dir+file_dir).average_cyclomatic_complexity, 'file': file_dir, 'commit': commit_hex})

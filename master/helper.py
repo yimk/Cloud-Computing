@@ -11,7 +11,7 @@ file reading helper
 
 
 def get_file_in_dir(dir):
-    return [file_name.replace(dir, '') for file_name in glob.glob(dir + "/**/*.*", recursive=True, )]
+    return [file_name.replace(dir, '') for file_name in glob.glob(dir + "/**/*.*", recursive=True)]
 
 
 def get_worker_info(base="docker-compose.yml"):
@@ -44,10 +44,12 @@ def retrieve_repository_tasks(repo, dir):
     """
     for current_commit in repo.iter_commits():
 
+        print("current_commit")
         git_checkout(dir, current_commit.hexsha)
         items = get_file_in_dir(dir)
 
         for item in items:
+            print("item")
             db_insert_single_task(file=item, commit=current_commit.hexsha)
 
 
@@ -114,8 +116,9 @@ def db_get_avg_complexity_result():
     sum_complexity = tasks_table().aggregate([{'$group': {'_id': None, 'total': {'$sum': '$result'}}}])
 
     result = list(sum_complexity)[0]
-    if result['sum'] > 0 and n > 0:
-        return result['sum']/n
+    print(result)
+    if result['total'] > 0 and n > 0:
+        return result['total']/n
     else:
         return 0
 
@@ -132,8 +135,12 @@ def db_insert_single_slave(addr):
     slave_table().insert_one(post)
 
 
+def db_remove_single_slave(addr):
+    slave_table().delete_one({'addr': addr})
+
+
 def db_get_all_slaves():
-    return slave_table().find()
+    return slave_table().find({})
 
 
 def slave_existed(addr):
@@ -158,9 +165,11 @@ def git_checkout(dir, commit):
 
 def git_clone_or_pull(repo_dir, local_dir):
 
-    if not os.path.exists(local_dir):
-        Repo.clone_from(repo_dir , local_dir)
-
+    if os.path.exists(local_dir):
+        import shutil
+        shutil.rmtree(local_dir)
+        
+    Repo.clone_from(repo_dir , local_dir)
     return Repo(local_dir)
 
 

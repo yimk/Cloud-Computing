@@ -3,7 +3,6 @@ import json
 import requests
 import sys
 import os
-import yaml
 import helper
 
 from git import Repo
@@ -12,6 +11,7 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 from itertools import chain, islice
+import datetime
 
 """
 Repo
@@ -33,6 +33,12 @@ declare rest app
 app = Flask(__name__)
 
 
+"""
+Start time
+"""
+start_time = None
+
+
 @app.route('/register', methods=['POST'])
 def register():
 
@@ -45,8 +51,21 @@ def register():
     return jsonify({'git-repo': TARGET_REPOSITORY, 'pattern': pattern})
 
 
+@app.route('/quit', methods=['POST'])
+def request_to_quit():
+
+    # allowing new slave join the system in real time
+    slave_address = request.remote_addr + ':' + request.headers.get('port')
+
+    # add slave to db
+    # require slave to init git repo
+    helper.db_remove_single_slave(slave_address)
+    return jsonify({'Success': 'True'})
+
 @app.route('/ask-for-work', methods=['POST'])
 def distribute_work():
+
+    global start_time
 
     # retrieve essential information
     data = request.get_json(force=True)
@@ -66,6 +85,11 @@ def distribute_work():
         tasks_list.append({'file': task['file'], 'commit': task['commit']})
         helper.db_start_task(task['file'], task['commit'], slave_address)
 
+    if not start_time:
+        start_time = datetime.datetime.now()
+
+
+
     return jsonify({'tasks': tasks_list})
 
 
@@ -77,12 +101,13 @@ def listen_for_result():
     for result in results:
         helper.db_complete_task(result['file'], result['commit'], result['complexity'])
 
-    # Check if all the tasks are completed, if yes, terminate the task
     if helper.db_get_incomplete_tasks().count() == 0:
-        print("Task Completed. The average cyclomatic complexity is: " + helper.db_get_avg_complexity_result())
+        print("Task Completed------------------------------------------------------------------------------------------")
+        print("The average cyclomatic complexity is: " + str(helper.db_get_avg_complexity_result()))
+        print("Time Taken: " + str((datetime.datetime.now() - start_time).microseconds))
     else:
-        print("Number of task remain: " + helper.db_get_incomplete_tasks().count())
-
+        print("Number of task remain: " + str(helper.db_get_incomplete_tasks().count()))
+        
 
 if __name__ == '__main__':
 
@@ -93,4 +118,5 @@ if __name__ == '__main__':
     helper.retrieve_repository_tasks(repo, TARGET_DIR)
 
     # run the rest api
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True, use_reloader=False, port=5000)
+
