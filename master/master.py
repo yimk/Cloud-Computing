@@ -107,6 +107,9 @@ def listen_for_result():
         print("Time Taken: " + str((datetime.datetime.now() - start_time).microseconds))
     else:
         print("Number of task remain: " + str(helper.db_get_incomplete_tasks().count()))
+
+
+    return "Success"
         
 
 if __name__ == '__main__':
